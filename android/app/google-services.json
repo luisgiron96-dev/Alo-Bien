@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "772909029694",
+    "project_id": "alo-bien-app",
+    "storage_bucket": "alo-bien-app.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:772909029694:android:69a69910431f362646b46f",
+        "android_client_info": {
+          "package_name": "com.alobien.alo_bien_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAIb2YKbEf54DSbqcX_4XR9LDuyvF8p5_o"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
