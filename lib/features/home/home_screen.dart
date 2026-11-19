@@ -286,7 +286,6 @@ class _BrandBanner extends StatelessWidget {
           // en cualquier pantalla.
           final w = box.maxWidth;
           final leftW = w * 0.38; // ancho del bloque logo + lema
-          final logoH = leftW * 0.4335; // logo con el ancho de la referencia
 
           // Tipografía de la referencia: Outfit (geométrica, trazo medio).
           final baseText = GoogleFonts.outfit(
@@ -296,9 +295,21 @@ class _BrandBanner extends StatelessWidget {
             color: Colors.white,
           );
 
-          return CustomPaint(
-            painter: _SwooshPainter(),
-            child: Padding(
+          return Stack(
+            fit: StackFit.passthrough,
+            children: [
+              // Fondo en alta resolución. Si el archivo no existe, usa el
+              // fondo dibujado por código como respaldo.
+              Positioned.fill(
+                child: Image.asset(
+                  'assets/images/banner_fondo.png',
+                  fit: BoxFit.fill,
+                  filterQuality: FilterQuality.high,
+                  errorBuilder: (_, __, ___) =>
+                      CustomPaint(painter: _SwooshPainter()),
+                ),
+              ),
+              Padding(
               padding: EdgeInsets.fromLTRB(w * 0.06, 18, w * 0.04, 18),
               child: Row(children: [
                 // ---- Logo + lema
@@ -307,16 +318,9 @@ class _BrandBanner extends StatelessWidget {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      SizedBox(
-                        width: leftW,
-                        height: logoH,
-                        child: OverflowBox(
-                          maxWidth: double.infinity,
-                          maxHeight: logoH,
-                          child: AloLogo(height: logoH),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
+                      // Tipografía de la referencia (condensada extra negrita).
+                      AloWordmark(width: leftW * 0.87),
+                      const SizedBox(height: 10),
                       // fitWidth: el lema ocupa exactamente el ancho del bloque.
                       FittedBox(
                         fit: BoxFit.fitWidth,
@@ -387,6 +391,7 @@ class _BrandBanner extends StatelessWidget {
                 ),
               ]),
             ),
+            ],
           );
         }),
       ),
