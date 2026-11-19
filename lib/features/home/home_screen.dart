@@ -1,4 +1,7 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/config.dart';
@@ -18,9 +21,6 @@ import 'content_list_screen.dart';
 const _cyan = Color(0xFF75DAF9);
 const _lightText = Color(0xFFC6DCF9);
 const _glow = Color(0xFF31ABE1);
-
-// Altura del logo ALO BIEN: la usan el banner de redes y la tarjeta destacada.
-const _brandLogoHeight = 64.0;
 
 void _openWeb(BuildContext context, String title, Uri uri) {
   Navigator.of(context).push(MaterialPageRoute(
@@ -78,7 +78,21 @@ class HomeScreen extends StatelessWidget {
                   : () => _openList(context, 'Contenido destacado',
                       featured.isNotEmpty ? featured : items),
             ),
-            _FeaturedRow(items: featured),
+            _FeaturedRow(
+              items: featured,
+              // El play del banner abre la ventana de reproducción del
+              // contenido principal (el mismo del héroe de arriba).
+              onPlayPromo: () {
+                if (hero != null) {
+                  showContentDetail(context, hero);
+                } else {
+                  ScaffoldMessenger.of(context)
+                    ..hideCurrentSnackBar()
+                    ..showSnackBar(const SnackBar(
+                        content: Text('Aún no hay contenido para reproducir.')));
+                }
+              },
+            ),
             SectionHeader(
               title: 'Productos ALO BIEN',
               moreLabel: 'Ver todos',
@@ -266,56 +280,91 @@ class _BrandBanner extends StatelessWidget {
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(17),
-        child: CustomPaint(
-          painter: _SwooshPainter(),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(12, 18, 12, 18),
-            child: Row(children: [
-                Expanded(
-                  flex: 6,
+        child: LayoutBuilder(builder: (context, box) {
+          // Todas las medidas son fracciones del ancho del banner, tomadas de
+          // la imagen de referencia, para que el espaciado se mantenga igual
+          // en cualquier pantalla.
+          final w = box.maxWidth;
+          final leftW = w * 0.38; // ancho del bloque logo + lema
+          final logoH = leftW * 0.4335; // logo con el ancho de la referencia
+
+          // Tipografía de la referencia: Outfit (geométrica, trazo medio).
+          final baseText = GoogleFonts.outfit(
+            fontSize: 20,
+            fontWeight: FontWeight.w500,
+            height: 1.22,
+            color: Colors.white,
+          );
+
+          return CustomPaint(
+            painter: _SwooshPainter(),
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(w * 0.06, 18, w * 0.04, 18),
+              child: Row(children: [
+                // ---- Logo + lema
+                SizedBox(
+                  width: leftW,
                   child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      const AloLogo(height: _brandLogoHeight),
+                      SizedBox(
+                        width: leftW,
+                        height: logoH,
+                        child: OverflowBox(
+                          maxWidth: double.infinity,
+                          maxHeight: logoH,
+                          child: AloLogo(height: logoH),
+                        ),
+                      ),
                       const SizedBox(height: 8),
-                      const FittedBox(
-                        fit: BoxFit.scaleDown,
+                      // fitWidth: el lema ocupa exactamente el ancho del bloque.
+                      FittedBox(
+                        fit: BoxFit.fitWidth,
                         child: Text('Conecta • Disfruta • Comparte',
-                            style: TextStyle(
-                                fontSize: 11, fontWeight: FontWeight.w600)),
+                            style: baseText.copyWith(
+                                fontSize: 12, height: 1.2)),
                       ),
                     ],
                   ),
                 ),
+                SizedBox(width: w * 0.05),
+                // ---- Divisor
                 Container(
-                  width: 1,
-                  height: 96,
-                  margin: const EdgeInsets.symmetric(horizontal: 8),
-                  color: Colors.white70,
+                  width: 2,
+                  height: w * 0.25,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(1),
+                  ),
                 ),
+                SizedBox(width: w * 0.07),
+                // ---- Texto + redes
                 Expanded(
-                  flex: 5,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Text.rich(
-                        TextSpan(
-                          text: 'Síguenos en nuestras redes y no te pierdas ',
-                          children: [
-                            TextSpan(
-                              text: 'ningún contenido',
-                              style: TextStyle(
-                                  color: _cyan, fontWeight: FontWeight.w800),
-                            ),
-                          ],
+                      // Los saltos de línea son los de la referencia; fitWidth
+                      // ajusta el tamaño para que la línea más larga llene el
+                      // ancho disponible.
+                      FittedBox(
+                        fit: BoxFit.fitWidth,
+                        alignment: Alignment.centerLeft,
+                        child: Text.rich(
+                          TextSpan(
+                            text: 'Síguenos en nuestras\nredes y no te pierdas\n',
+                            style: baseText,
+                            children: [
+                              TextSpan(
+                                text: 'ningún contenido',
+                                style: baseText.copyWith(
+                                    color: _cyan, fontWeight: FontWeight.w700),
+                              ),
+                            ],
+                          ),
                         ),
-                        style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            height: 1.3),
                       ),
-                      const SizedBox(height: 12),
+                      SizedBox(height: w * 0.035),
                       LayoutBuilder(builder: (context, c) {
                         const gap = 4.0;
                         final n = SocialLinks.all.length;
@@ -337,8 +386,9 @@ class _BrandBanner extends StatelessWidget {
                   ),
                 ),
               ]),
-          ),
-        ),
+            ),
+          );
+        }),
       ),
     );
   }
@@ -427,7 +477,8 @@ const _featuredAspect = 2.9;
 
 class _FeaturedRow extends StatelessWidget {
   final List<ContentItem> items;
-  const _FeaturedRow({required this.items});
+  final VoidCallback onPlayPromo;
+  const _FeaturedRow({required this.items, required this.onPlayPromo});
 
   @override
   Widget build(BuildContext context) {
@@ -439,7 +490,7 @@ class _FeaturedRow extends StatelessWidget {
       child: items.isEmpty
           ? Padding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-              child: const _PromoCard(),
+              child: _PromoCard(onPlay: onPlayPromo),
             )
           : ListView.separated(
               scrollDirection: Axis.horizontal,
@@ -486,7 +537,7 @@ class _FeaturedCard extends StatelessWidget {
                   Padding(
                     padding: const EdgeInsets.all(16),
                     child: Row(children: [
-                      const _PlayButton(),
+                      const _PlayButton(size: 62),
                       const SizedBox(width: 10),
                       Expanded(
                         child: Column(
@@ -513,7 +564,7 @@ class _FeaturedCard extends StatelessWidget {
                 ])
               // Sin portada: la imagen de marca del diseño (destellos,
               // tipografía y cámara incluidos).
-              : const _PromoImage(),
+              : _PromoImage(onPlay: () => showContentDetail(context, item)),
         ),
       ),
     );
@@ -530,33 +581,77 @@ final _featuredDecoration = BoxDecoration(
 );
 
 /// Imagen de marca "ALO BIEN – MUCHO MÁS QUE NOTICIAS" tomada del diseño.
+///
+/// La imagen ya NO trae el botón de play dibujado: el play es un widget real
+/// (tocable) que se coloca encima, en el mismo sitio donde estaba el dibujado.
 class _PromoImage extends StatelessWidget {
-  const _PromoImage();
+  final VoidCallback onPlay;
+  const _PromoImage({required this.onPlay});
+
+  // Medidas de assets/images/banner_destacado_sin_play.png (1920 x 601 px).
+  static const _imgW = 1920.0;
+  static const _imgH = 601.0;
+  static const _playCx = 0.1172; // centro X del play (fracción del ancho)
+  static const _playCy = 0.535; // centro Y del play (fracción del alto)
+  static const _playDiameter = 0.112; // diámetro (fracción del ancho)
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox.expand(
-      child: Image.asset(
-        'assets/images/banner_destacado.png',
-        fit: BoxFit.cover,
-        alignment: Alignment.center,
-        filterQuality: FilterQuality.high,
-        errorBuilder: (_, __, ___) => const ColoredBox(color: Color(0xFF05265F)),
-      ),
-    );
+    return LayoutBuilder(builder: (context, c) {
+      // Mismo cálculo que BoxFit.cover, para que el play caiga siempre en su
+      // sitio aunque la tarjeta recorte los bordes de la imagen.
+      final scale = math.max(c.maxWidth / _imgW, c.maxHeight / _imgH);
+      final drawnW = _imgW * scale;
+      final drawnH = _imgH * scale;
+      final left = (c.maxWidth - drawnW) / 2;
+      final top = (c.maxHeight - drawnH) / 2;
+      final cx = left + _playCx * drawnW;
+      final cy = top + _playCy * drawnH;
+      final d = _playDiameter * drawnW;
+      final tap = math.max(d, 48.0); // área táctil mínima recomendada
+
+      return Stack(fit: StackFit.expand, children: [
+        Image.asset(
+          'assets/images/banner_destacado_sin_play.png',
+          fit: BoxFit.cover,
+          alignment: Alignment.center,
+          filterQuality: FilterQuality.high,
+          errorBuilder: (_, __, ___) =>
+              const ColoredBox(color: Color(0xFF05265F)),
+        ),
+        Positioned(
+          left: cx - tap / 2,
+          top: cy - tap / 2,
+          width: tap,
+          height: tap,
+          child: Semantics(
+            button: true,
+            label: 'Reproducir contenido',
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: onPlay,
+              child: Center(child: _PlayButton(size: d)),
+            ),
+          ),
+        ),
+      ]);
+    });
   }
 }
 
 /// Botón de play del diseño: círculo azul oscuro con borde blanco, brillo
-/// azul alrededor y un segundo anillo tenue por fuera.
+/// azul alrededor y un segundo anillo tenue por fuera. [size] es el diámetro
+/// total (anillo exterior incluido).
 class _PlayButton extends StatelessWidget {
-  const _PlayButton();
+  final double size;
+  const _PlayButton({required this.size});
 
   @override
   Widget build(BuildContext context) {
+    final inner = size * 0.8;
     return Container(
-      width: 62,
-      height: 62,
+      width: size,
+      height: size,
       alignment: Alignment.center,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
@@ -564,8 +659,8 @@ class _PlayButton extends StatelessWidget {
             color: Colors.white.withValues(alpha: 0.28), width: 1.5),
       ),
       child: Container(
-        width: 50,
-        height: 50,
+        width: inner,
+        height: inner,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           color: const Color(0xCC05265F),
@@ -578,8 +673,8 @@ class _PlayButton extends StatelessWidget {
             ),
           ],
         ),
-        child: const Icon(Icons.play_arrow_rounded,
-            size: 32, color: Colors.white),
+        child: Icon(Icons.play_arrow_rounded,
+            size: inner * 0.64, color: Colors.white),
       ),
     );
   }
@@ -587,7 +682,8 @@ class _PlayButton extends StatelessWidget {
 
 /// Banner de marca que se muestra mientras no haya contenido destacado.
 class _PromoCard extends StatelessWidget {
-  const _PromoCard();
+  final VoidCallback onPlay;
+  const _PromoCard({required this.onPlay});
 
   @override
   Widget build(BuildContext context) {
@@ -595,7 +691,7 @@ class _PromoCard extends StatelessWidget {
       decoration: _featuredDecoration,
       child: ClipRRect(
         borderRadius: BorderRadius.circular(17),
-        child: const _PromoImage(),
+        child: _PromoImage(onPlay: onPlay),
       ),
     );
   }
