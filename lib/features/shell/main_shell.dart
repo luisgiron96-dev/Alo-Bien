@@ -4,6 +4,7 @@ import '../../core/theme.dart';
 import '../../models/user_profile.dart';
 import '../../services/notifications_controller.dart';
 import '../../services/push_service.dart';
+import '../../widgets/alo_logo.dart';
 import '../about/about_screen.dart';
 import '../creator/creator_dashboard_screen.dart';
 import '../home/home_screen.dart';
@@ -84,20 +85,26 @@ class _MainShellState extends State<MainShell> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Image.asset(
-          'assets/images/logo.png',
-          height: 32,
-          errorBuilder: (_, __, ___) => const Text('ALO BIEN',
-              style: TextStyle(fontWeight: FontWeight.w800)),
-        ),
+        toolbarHeight: 64,
+        title: const AloLogo(height: 34, alignment: Alignment.centerLeft),
         actions: [
           if (widget.profile.isCreator)
-            const Padding(
-              padding: EdgeInsets.only(right: 12),
-              child: Chip(
-                label: Text('CREADOR', style: TextStyle(fontSize: 10)),
-                visualDensity: VisualDensity.compact,
-                backgroundColor: AloColors.violet,
+            Padding(
+              padding: const EdgeInsets.only(right: 16),
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                decoration: BoxDecoration(
+                  color: AloColors.indicator,
+                  borderRadius: BorderRadius.circular(10),
+                  border:
+                      Border.all(color: const Color(0xCCFFFFFF), width: 1.5),
+                ),
+                child: const Text('CREADOR',
+                    style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 0.5)),
               ),
             ),
         ],

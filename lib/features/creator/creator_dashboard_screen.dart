@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+
 import '../../core/supabase_config.dart';
 import '../../core/theme.dart';
 import '../../models/content_item.dart';
 import '../../widgets/content_detail_sheet.dart';
 import '../../widgets/cover_image.dart';
+import 'upload_content_screen.dart';
 
 class CreatorDashboardScreen extends StatefulWidget {
   const CreatorDashboardScreen({super.key});
@@ -24,6 +26,67 @@ class _CreatorDashboardScreenState extends State<CreatorDashboardScreen> {
   Future<void> _refresh() async {
     setState(() => _future = _load());
     await _future;
+  }
+
+  void _toast(String text) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(text)));
+  }
+
+  Future<void> _openUpload() async {
+    final ok = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(builder: (_) => const UploadContentScreen()),
+    );
+    if (ok == true) {
+      await _refresh();
+      _toast('Publicación guardada.');
+    }
+  }
+
+  Future<void> _setStatus(ContentItem item, bool publish) async {
+    try {
+      await db
+          .from('content')
+          .update({'status': publish ? 'published' : 'draft'}).eq('id', item.id);
+      await _refresh();
+      _toast(publish ? 'Contenido publicado.' : 'Contenido despublicado.');
+    } catch (_) {
+      _toast('No se pudo cambiar el estado.');
+    }
+  }
+
+  Future<void> _delete(ContentItem item) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Eliminar contenido'),
+        content: Text('¿Eliminar "${item.title}"? Esta acción no se puede deshacer.'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancelar')),
+          FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Eliminar')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    try {
+      if (item.filePath != null && item.filePath!.isNotEmpty) {
+        await db.storage.from('media').remove([item.filePath!]);
+      }
+      if (item.coverPath != null && item.coverPath!.isNotEmpty) {
+        await db.storage.from('covers').remove([item.coverPath!]);
+      }
+      await db.from('content').delete().eq('id', item.id);
+      await _refresh();
+      _toast('Contenido eliminado.');
+    } catch (_) {
+      _toast('No se pudo eliminar.');
+    }
   }
 
   @override
@@ -51,6 +114,15 @@ class _CreatorDashboardScreenState extends State<CreatorDashboardScreen> {
             children: [
               const Text('Panel de creador',
                   style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+              const SizedBox(height: 14),
+              FilledButton.icon(
+                onPressed: _openUpload,
+                icon: const Icon(Icons.cloud_upload_rounded),
+                label: const Text('Subir contenido'),
+                style: FilledButton.styleFrom(
+                    minimumSize: const Size.fromHeight(48),
+                    backgroundColor: AloColors.violet),
+              ),
               const SizedBox(height: 14),
               Row(children: [
                 _Stat(label: 'Total', value: items.length),
@@ -83,7 +155,28 @@ class _CreatorDashboardScreenState extends State<CreatorDashboardScreen> {
                   title: Text(item.title,
                       maxLines: 1, overflow: TextOverflow.ellipsis),
                   subtitle: Text('${item.type.label} • ${item.dateLabel}'),
-                  trailing: _StatusChip(published: item.status == 'published'),
+                  trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+                    _StatusChip(published: item.status == 'published'),
+                    PopupMenuButton<String>(
+                      onSelected: (v) {
+                        if (v == 'toggle') {
+                          _setStatus(item, item.status != 'published');
+                        } else if (v == 'delete') {
+                          _delete(item);
+                        }
+                      },
+                      itemBuilder: (_) => [
+                        PopupMenuItem(
+                          value: 'toggle',
+                          child: Text(item.status == 'published'
+                              ? 'Despublicar'
+                              : 'Publicar'),
+                        ),
+                        const PopupMenuItem(
+                            value: 'delete', child: Text('Eliminar')),
+                      ],
+                    ),
+                  ]),
                 ),
             ],
           );

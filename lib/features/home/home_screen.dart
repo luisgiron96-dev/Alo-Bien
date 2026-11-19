@@ -1,10 +1,38 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
+
+import '../../core/config.dart';
+import '../../core/social_links.dart';
 import '../../core/theme.dart';
 import '../../models/content_item.dart';
 import '../../services/content_repository.dart';
+import '../../widgets/alo_logo.dart';
 import '../../widgets/content_card.dart';
 import '../../widgets/content_detail_sheet.dart';
 import '../../widgets/cover_image.dart';
+import '../../widgets/section_header.dart';
+import '../profile/web_page_screen.dart';
+import 'content_list_screen.dart';
+
+// Colores medidos del diseño de referencia.
+const _cyan = Color(0xFF75DAF9);
+const _lightText = Color(0xFFC6DCF9);
+const _glow = Color(0xFF31ABE1);
+
+// Altura del logo ALO BIEN: la usan el banner de redes y la tarjeta destacada.
+const _brandLogoHeight = 64.0;
+
+void _openWeb(BuildContext context, String title, Uri uri) {
+  Navigator.of(context).push(MaterialPageRoute(
+    builder: (_) => WebPageScreen(title: title, uri: uri),
+  ));
+}
+
+void _openList(BuildContext context, String title, List<ContentItem> items) {
+  Navigator.of(context).push(MaterialPageRoute(
+    builder: (_) => ContentListScreen(title: title, items: items),
+  ));
+}
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -15,20 +43,22 @@ class HomeScreen extends StatelessWidget {
       stream: ContentRepository.watchPublished(),
       builder: (context, snap) {
         if (snap.hasError) {
-          return const _Message(
-              icon: Icons.wifi_off_rounded,
-              text: 'No pudimos cargar el contenido. Revisa tu conexión.');
+          return const Center(
+            child: Padding(
+              padding: EdgeInsets.all(32),
+              child: Text('No pudimos cargar el contenido. Revisa tu conexión.',
+                  textAlign: TextAlign.center),
+            ),
+          );
         }
         if (!snap.hasData) {
           return const Center(child: CircularProgressIndicator());
         }
         final items = snap.data!;
-        if (items.isEmpty) {
-          return const _Message(
-              icon: Icons.movie_outlined,
-              text: 'Aún no hay contenido publicado.');
-        }
-        final hero = items.firstWhere((i) => i.featured, orElse: () => items.first);
+        final featured = items.where((i) => i.featured).toList();
+        final hero = featured.isNotEmpty
+            ? featured.first
+            : (items.isNotEmpty ? items.first : null);
         final rows = <(String, List<ContentItem>)>[
           ('Novedades', items.where((i) => i.isNew).toList()),
           for (final t in ContentType.values)
@@ -38,8 +68,37 @@ class HomeScreen extends StatelessWidget {
         return ListView(
           padding: EdgeInsets.zero,
           children: [
-            _Hero(item: hero),
-            for (final r in rows) _Row(title: r.$1, items: r.$2),
+            if (hero != null) _Hero(item: hero),
+            const _BrandBanner(),
+            SectionHeader(
+              title: 'Contenido destacado',
+              moreLabel: 'Ver más',
+              onMore: items.isEmpty
+                  ? null
+                  : () => _openList(context, 'Contenido destacado',
+                      featured.isNotEmpty ? featured : items),
+            ),
+            _FeaturedRow(items: featured),
+            SectionHeader(
+              title: 'Productos ALO BIEN',
+              moreLabel: 'Ver todos',
+              onMore: () =>
+                  _openWeb(context, 'Tienda', AppConfig.tabs[3].uri),
+            ),
+            const _Products(),
+            if (items.isEmpty)
+              const Padding(
+                padding: EdgeInsets.all(32),
+                child: Center(child: Text('Aún no hay contenido publicado.')),
+              ),
+            for (final r in rows) ...[
+              SectionHeader(
+                title: r.$1,
+                moreLabel: 'Ver más',
+                onMore: () => _openList(context, r.$1, r.$2),
+              ),
+              _ContentRow(items: r.$2),
+            ],
             const SizedBox(height: 24),
           ],
         );
@@ -48,18 +107,23 @@ class HomeScreen extends StatelessWidget {
   }
 }
 
+// ---------------------------------------------------------------- Hero
+
 class _Hero extends StatelessWidget {
   final ContentItem item;
   const _Hero({required this.item});
 
   @override
   Widget build(BuildContext context) {
+    final label = (item.category != null && item.category!.isNotEmpty)
+        ? item.category!
+        : item.type.label;
     return SizedBox(
-      height: 380,
+      height: 320,
       child: Stack(
         fit: StackFit.expand,
         children: [
-          CoverImage(item: item),
+          CoverImage(item: item, showIcon: false),
           const DecoratedBox(
             decoration: BoxDecoration(
               gradient: LinearGradient(
@@ -70,20 +134,40 @@ class _Hero extends StatelessWidget {
             ),
           ),
           Positioned(
+            top: 24,
+            left: 0,
+            right: 0,
+            child: Center(
+              child: GestureDetector(
+                onTap: () => showContentDetail(context, item),
+                child: Container(
+                  width: 64,
+                  height: 64,
+                  decoration: const BoxDecoration(
+                      color: Color(0xE6FFFFFF), shape: BoxShape.circle),
+                  child: const Icon(Icons.play_arrow_rounded,
+                      size: 42, color: AloColors.bgDeep),
+                ),
+              ),
+            ),
+          ),
+          Positioned(
             left: 20,
             right: 20,
-            bottom: 20,
+            bottom: 16,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
                 Row(children: [
                   if (item.isNew) ...[const NewBadge(), const SizedBox(width: 8)],
-                  Text(
-                    (item.category != null && item.category!.isNotEmpty)
-                        ? item.category!
-                        : item.type.label,
-                    style: const TextStyle(
-                        color: AloColors.lavender, fontWeight: FontWeight.w700),
+                  Flexible(
+                    child: Text(label,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            color: AloColors.lavender,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600)),
                   ),
                 ]),
                 const SizedBox(height: 8),
@@ -91,19 +175,20 @@ class _Hero extends StatelessWidget {
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                        fontSize: 26, fontWeight: FontWeight.w800)),
-                if (item.description != null && item.description!.isNotEmpty) ...[
+                        fontSize: 26, fontWeight: FontWeight.w700)),
+                if (item.description != null &&
+                    item.description!.isNotEmpty) ...[
                   const SizedBox(height: 6),
                   Text(item.description!,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(color: Colors.white70)),
+                      style: const TextStyle(color: _lightText)),
                 ],
                 const SizedBox(height: 14),
-                FilledButton.icon(
-                  onPressed: () => showContentDetail(context, item),
-                  icon: const Icon(Icons.info_outline_rounded),
-                  label: const Text('Ver detalles'),
+                _GlowButton(
+                  label: 'Ver detalles',
+                  icon: Icons.info_outline_rounded,
+                  onTap: () => showContentDetail(context, item),
                 ),
               ],
             ),
@@ -114,53 +199,592 @@ class _Hero extends StatelessWidget {
   }
 }
 
-class _Row extends StatelessWidget {
-  final String title;
-  final List<ContentItem> items;
-  const _Row({required this.title, required this.items});
+class _GlowButton extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final VoidCallback onTap;
+  const _GlowButton(
+      {required this.label, required this.icon, required this.onTap});
 
   @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 20, 16, 10),
-          child: Text(title,
-              style:
-                  const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
-        ),
-        SizedBox(
-          height: 256,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            itemCount: items.length,
-            separatorBuilder: (_, __) => const SizedBox(width: 12),
-            itemBuilder: (context, i) => ContentCard(
-              item: items[i],
-              onTap: () => showContentDetail(context, items[i]),
+  Widget build(BuildContext context) => Material(
+        color: Colors.transparent,
+        child: Ink(
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+                colors: [Color(0xFF3A6DB0), Color(0xFF2B4F86)]),
+            borderRadius: BorderRadius.circular(28),
+            border: Border.all(color: const Color(0x44FFFFFF)),
+            boxShadow: const [
+              BoxShadow(color: Color(0x554C8DFF), blurRadius: 18)
+            ],
+          ),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(28),
+            onTap: onTap,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 13),
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                Icon(icon, size: 20),
+                const SizedBox(width: 10),
+                Text(label,
+                    style: const TextStyle(
+                        fontSize: 15, fontWeight: FontWeight.w600)),
+              ]),
             ),
           ),
         ),
+      );
+}
+
+// -------------------------------------------------------- Banner de marca
+
+class _BrandBanner extends StatelessWidget {
+  const _BrandBanner();
+
+  Future<void> _open(BuildContext context, SocialLink s) async {
+    if (!s.hasLink) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(
+            content: Text('El enlace de ${s.label} estará disponible pronto.')));
+      return;
+    }
+    await launchUrl(Uri.parse(s.url), mode: LaunchMode.externalApplication);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: _glow.withValues(alpha: 0.7)),
+        boxShadow: [
+          BoxShadow(color: _glow.withValues(alpha: 0.25), blurRadius: 18),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(17),
+        child: CustomPaint(
+          painter: _SwooshPainter(),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(12, 18, 12, 18),
+            child: Row(children: [
+                Expanded(
+                  flex: 6,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const AloLogo(height: _brandLogoHeight),
+                      const SizedBox(height: 8),
+                      const FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text('Conecta • Disfruta • Comparte',
+                            style: TextStyle(
+                                fontSize: 11, fontWeight: FontWeight.w600)),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  width: 1,
+                  height: 96,
+                  margin: const EdgeInsets.symmetric(horizontal: 8),
+                  color: Colors.white70,
+                ),
+                Expanded(
+                  flex: 5,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Text.rich(
+                        TextSpan(
+                          text: 'Síguenos en nuestras redes y no te pierdas ',
+                          children: [
+                            TextSpan(
+                              text: 'ningún contenido',
+                              style: TextStyle(
+                                  color: _cyan, fontWeight: FontWeight.w800),
+                            ),
+                          ],
+                        ),
+                        style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            height: 1.3),
+                      ),
+                      const SizedBox(height: 12),
+                      LayoutBuilder(builder: (context, c) {
+                        const gap = 4.0;
+                        final n = SocialLinks.all.length;
+                        final size = ((c.maxWidth - gap * (n - 1)) / n)
+                            .clamp(18.0, 30.0)
+                            .toDouble();
+                        return Row(children: [
+                          for (var i = 0; i < n; i++) ...[
+                            if (i > 0) const SizedBox(width: gap),
+                            _SocialButton(
+                              link: SocialLinks.all[i],
+                              size: size,
+                              onTap: () => _open(context, SocialLinks.all[i]),
+                            ),
+                          ],
+                        ]);
+                      }),
+                    ],
+                  ),
+                ),
+              ]),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SocialButton extends StatelessWidget {
+  final SocialLink link;
+  final double size;
+  final VoidCallback onTap;
+  const _SocialButton(
+      {required this.link, required this.size, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: link.label,
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: onTap,
+        child: Image.asset(
+          link.asset,
+          width: size,
+          height: size,
+          errorBuilder: (_, __, ___) => Container(
+            width: size,
+            height: size,
+            decoration: const BoxDecoration(
+                color: Colors.white, shape: BoxShape.circle),
+            child: Icon(Icons.link_rounded,
+                size: size * 0.55, color: AloColors.bgDeep),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Fondo del banner: degradado azul con las dos curvas cian del diseño.
+class _SwooshPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final w = size.width, h = size.height;
+    final rect = Offset.zero & size;
+    canvas.drawRect(
+      rect,
+      Paint()
+        ..shader = const LinearGradient(
+          colors: [Color(0xFF0B3380), Color(0xFF062353)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ).createShader(rect),
+    );
+
+    Paint stroke(double width, double alpha) => Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round
+      ..strokeWidth = width
+      ..color = _glow.withValues(alpha: alpha)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 1.5);
+
+    // Curva superior izquierda.
+    final top = Path()
+      ..moveTo(-8, h * 0.78)
+      ..quadraticBezierTo(w * 0.03, h * 0.12, w * 0.36, -6);
+    canvas.drawPath(top, stroke(14, 0.85));
+    canvas.drawPath(top.shift(const Offset(10, 8)), stroke(3, 0.5));
+
+    // Curva inferior derecha.
+    final bottom = Path()
+      ..moveTo(w + 8, h * 0.22)
+      ..quadraticBezierTo(w * 0.97, h * 0.88, w * 0.60, h + 6);
+    canvas.drawPath(bottom, stroke(14, 0.85));
+    canvas.drawPath(bottom.shift(const Offset(-10, -8)), stroke(3, 0.5));
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+// ------------------------------------------------------ Contenido destacado
+
+class _FeaturedRow extends StatelessWidget {
+  final List<ContentItem> items;
+  const _FeaturedRow({required this.items});
+
+  @override
+  Widget build(BuildContext context) {
+    final cardWidth =
+        (MediaQuery.of(context).size.width - 48).clamp(260.0, 360.0).toDouble();
+    return SizedBox(
+      height: 164,
+      child: items.isEmpty
+          ? const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16),
+              child: _PromoCard(),
+            )
+          : ListView.separated(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              itemCount: items.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 12),
+              itemBuilder: (context, i) => SizedBox(
+                width: cardWidth,
+                child: _FeaturedCard(item: items[i]),
+              ),
+            ),
+    );
+  }
+}
+
+class _FeaturedCard extends StatelessWidget {
+  final ContentItem item;
+  const _FeaturedCard({required this.item});
+
+  @override
+  Widget build(BuildContext context) {
+    final hasCover = item.coverUrl != null && item.coverUrl!.isNotEmpty;
+    return GestureDetector(
+      onTap: () => showContentDetail(context, item),
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: _glow.withValues(alpha: 0.5)),
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(17),
+          child: Stack(fit: StackFit.expand, children: [
+            if (hasCover) ...[
+              CoverImage(item: item, showIcon: false),
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      AloColors.bgDeep.withValues(alpha: 0.9),
+                      Colors.transparent,
+                    ],
+                    begin: Alignment.centerLeft,
+                    end: Alignment.centerRight,
+                  ),
+                ),
+              ),
+            ] else
+              // Sin portada: fondo de marca con la cámara.
+              const _PromoBackdrop(),
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(children: [
+                const _PlayButton(),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: hasCover
+                      ? Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(item.title,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w800)),
+                            const SizedBox(height: 4),
+                            Text(item.type.label,
+                                style: const TextStyle(
+                                    color: _cyan,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600)),
+                          ],
+                        )
+                      // Sin portada: logo y lema, como en el diseño.
+                      : const _BrandSlogan(),
+                ),
+              ]),
+            ),
+          ]),
+        ),
+      ),
+    );
+  }
+}
+
+/// Botón de play del diseño: círculo azul oscuro con borde blanco, brillo
+/// azul alrededor y un segundo anillo tenue por fuera.
+class _PlayButton extends StatelessWidget {
+  const _PlayButton();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 62,
+      height: 62,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(
+            color: Colors.white.withValues(alpha: 0.28), width: 1.5),
+      ),
+      child: Container(
+        width: 50,
+        height: 50,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: const Color(0xCC05265F),
+          border: Border.all(color: Colors.white, width: 2),
+          boxShadow: [
+            BoxShadow(
+              color: _glow.withValues(alpha: 0.6),
+              blurRadius: 14,
+              spreadRadius: 1,
+            ),
+          ],
+        ),
+        child: const Icon(Icons.play_arrow_rounded,
+            size: 32, color: Colors.white),
+      ),
+    );
+  }
+}
+
+/// Logo de ALO BIEN con el lema "MUCHO MÁS QUE NOTICIAS".
+class _BrandSlogan extends StatelessWidget {
+  const _BrandSlogan();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        AloLogo(height: _brandLogoHeight, alignment: Alignment.centerLeft),
+        SizedBox(height: 4),
+        Text('MUCHO MÁS\nQUE NOTICIAS',
+            style: TextStyle(
+                color: _cyan,
+                fontSize: 17,
+                fontWeight: FontWeight.w900,
+                height: 1.1)),
       ],
     );
   }
 }
 
-class _Message extends StatelessWidget {
-  final IconData icon;
-  final String text;
-  const _Message({required this.icon, required this.text});
+/// Fondo de marca: azul con la cámara a la derecha, que se funde hacia la
+/// izquierda para dejar sitio al texto.
+class _PromoBackdrop extends StatelessWidget {
+  const _PromoBackdrop();
+
+  static const _base = Color(0xFF05265F);
+
   @override
-  Widget build(BuildContext context) => Center(
-        child: Padding(
-          padding: const EdgeInsets.all(32),
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            Icon(icon, size: 52, color: AloColors.lavender),
-            const SizedBox(height: 14),
-            Text(text, textAlign: TextAlign.center),
-          ]),
+  Widget build(BuildContext context) {
+    return Stack(fit: StackFit.expand, children: [
+      const DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Color(0xFF0B3C8C), _base],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
         ),
-      );
+      ),
+      Positioned(
+        right: 0,
+        top: 0,
+        bottom: 0,
+        width: 150,
+        child: Stack(fit: StackFit.expand, children: [
+          Image.asset(
+            'assets/images/banner_camara.png',
+            fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+          ),
+          const DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [_base, Color(0x0005265F)],
+                stops: [0.0, 0.55],
+                begin: Alignment.centerLeft,
+                end: Alignment.centerRight,
+              ),
+            ),
+          ),
+        ]),
+      ),
+    ]);
+  }
+}
+
+/// Banner de marca que se muestra mientras no haya contenido destacado.
+class _PromoCard extends StatelessWidget {
+  const _PromoCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: _glow.withValues(alpha: 0.5)),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(17),
+        child: const Stack(fit: StackFit.expand, children: [
+          _PromoBackdrop(),
+          Padding(
+            padding: EdgeInsets.fromLTRB(20, 16, 16, 16),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: _BrandSlogan(),
+            ),
+          ),
+        ]),
+      ),
+    );
+  }
+}
+
+// ------------------------------------------------------------- Productos
+
+class _Products extends StatelessWidget {
+  const _Products();
+
+  @override
+  Widget build(BuildContext context) {
+    void tienda() => _openWeb(context, 'Tienda', AppConfig.tabs[3].uri);
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Row(children: [
+        Expanded(
+          child: _ProductCard(
+            asset: 'assets/images/producto_viceras.png',
+            line1: 'Viceras',
+            line2: 'ORIGINALES',
+            onTap: tienda,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: _ProductCard(
+            asset: 'assets/images/producto_llaveros.png',
+            line1: 'LLAVEROS',
+            line2: 'originales',
+            onTap: tienda,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: _ProductCard(
+            asset: 'assets/images/producto_verificacion.png',
+            line1: 'Verificación',
+            line2: 'de integrante',
+            // El formulario de verificación está en la página principal del sitio.
+            onTap: () => _openWeb(context, 'Verificación de integrante',
+                Uri.https(AppConfig.host, '/')),
+          ),
+        ),
+      ]),
+    );
+  }
+}
+
+class _ProductCard extends StatelessWidget {
+  final String asset;
+  final String line1;
+  final String line2;
+  final VoidCallback onTap;
+  const _ProductCard({
+    required this.asset,
+    required this.line1,
+    required this.line2,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0xFF1B4D95), Color(0xFF0A2142)],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+          ),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.white12),
+        ),
+        child: Column(children: [
+          ClipRRect(
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+            child: AspectRatio(
+              aspectRatio: 199 / 154,
+              child: Image.asset(
+                asset,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => Container(
+                  color: AloColors.indicator,
+                  child: const Icon(Icons.shopping_bag_rounded,
+                      size: 36, color: Colors.white54),
+                ),
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(6, 10, 6, 12),
+            child: Column(children: [
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(line1,
+                    style: const TextStyle(
+                        fontSize: 14, fontWeight: FontWeight.w700)),
+              ),
+              const SizedBox(height: 2),
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(line2,
+                    style: const TextStyle(fontSize: 11, color: _lightText)),
+              ),
+            ]),
+          ),
+        ]),
+      ),
+    );
+  }
+}
+
+// ----------------------------------------------------- Filas de contenido
+
+class _ContentRow extends StatelessWidget {
+  final List<ContentItem> items;
+  const _ContentRow({required this.items});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 256,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        itemCount: items.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 12),
+        itemBuilder: (context, i) => ContentCard(
+          item: items[i],
+          onTap: () => showContentDetail(context, items[i]),
+        ),
+      ),
+    );
+  }
 }

@@ -1,14 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-/// Colores aproximados tomados de las capturas del sitio.
-/// TODO: reemplazar por los valores exactos del CSS de alobienplataforma.com.
+/// Paleta azul marino, medida de la captura de referencia.
+/// Los nombres 'violet' y 'lavender' se conservan para no tocar otros
+/// archivos: 'violet' es el acento principal y 'lavender' el acento claro.
 class AloColors {
-  static const bg = Color(0xFF1E1646);
-  static const bgDeep = Color(0xFF160F36);
-  static const violet = Color(0xFF7C4DDB);
-  static const lavender = Color(0xFF8B6FD6);
-  static const blue = Color(0xFF0077B6);
+  static const bg = Color(0xFF0D1933); // fondo de pantallas
+  static const bgDeep = Color(0xFF0B172F); // barra superior e inferior
+  static const violet = Color(0xFF3565A5); // acento principal (botones, NUEVO)
+  static const lavender = Color(0xFFCAD9F6); // acento claro (iconos, textos)
+  static const indicator = Color(0xFF24406F); // tarjetas, hero, indicador
+  static const blue = Color(0xFF335C97);
   static const onDark = Colors.white;
 }
 
@@ -18,7 +20,9 @@ ThemeData buildTheme() {
     scaffoldBackgroundColor: AloColors.bg,
     colorScheme: const ColorScheme.dark(
       primary: AloColors.violet,
+      onPrimary: Colors.white,
       secondary: AloColors.lavender,
+      onSecondary: AloColors.bgDeep,
       surface: AloColors.bgDeep,
     ),
     textTheme: GoogleFonts.montserratTextTheme(base.textTheme),
@@ -29,7 +33,7 @@ ThemeData buildTheme() {
     ),
     navigationBarTheme: NavigationBarThemeData(
       backgroundColor: AloColors.bgDeep,
-      indicatorColor: AloColors.violet.withValues(alpha: 0.35),
+      indicatorColor: AloColors.indicator,
       labelTextStyle: WidgetStatePropertyAll(
         GoogleFonts.montserrat(fontSize: 11, fontWeight: FontWeight.w600),
       ),
