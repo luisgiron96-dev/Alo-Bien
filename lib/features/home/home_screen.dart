@@ -420,24 +420,30 @@ class _SwooshPainter extends CustomPainter {
 
 // ------------------------------------------------------ Contenido destacado
 
+/// Proporción (ancho / alto) de la tarjeta de contenido destacado.
+/// Más alto = más alargada hacia los lados. Para hacerla un poco más alta
+/// baja este número (p. ej. 2.6); para hacerla más baja, súbelo (p. ej. 3.2).
+const _featuredAspect = 2.9;
+
 class _FeaturedRow extends StatelessWidget {
   final List<ContentItem> items;
   const _FeaturedRow({required this.items});
 
   @override
   Widget build(BuildContext context) {
-    final cardWidth =
-        (MediaQuery.of(context).size.width - 48).clamp(260.0, 360.0).toDouble();
+    // Ancho completo, igual que el banner de redes de arriba.
+    final cardWidth = MediaQuery.of(context).size.width - 32;
+    final cardHeight = cardWidth / _featuredAspect;
     return SizedBox(
-      height: 164,
+      height: cardHeight + 8, // +8 para que no se corte el brillo
       child: items.isEmpty
-          ? const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16),
-              child: _PromoCard(),
+          ? Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+              child: const _PromoCard(),
             )
           : ListView.separated(
               scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 16),
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
               itemCount: items.length,
               separatorBuilder: (_, __) => const SizedBox(width: 12),
               itemBuilder: (context, i) => SizedBox(
@@ -459,38 +465,31 @@ class _FeaturedCard extends StatelessWidget {
     return GestureDetector(
       onTap: () => showContentDetail(context, item),
       child: Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: _glow.withValues(alpha: 0.5)),
-        ),
+        decoration: _featuredDecoration,
         child: ClipRRect(
           borderRadius: BorderRadius.circular(17),
-          child: Stack(fit: StackFit.expand, children: [
-            if (hasCover) ...[
-              CoverImage(item: item, showIcon: false),
-              DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      AloColors.bgDeep.withValues(alpha: 0.9),
-                      Colors.transparent,
-                    ],
-                    begin: Alignment.centerLeft,
-                    end: Alignment.centerRight,
+          child: hasCover
+              ? Stack(fit: StackFit.expand, children: [
+                  CoverImage(item: item, showIcon: false),
+                  DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          AloColors.bgDeep.withValues(alpha: 0.9),
+                          Colors.transparent,
+                        ],
+                        begin: Alignment.centerLeft,
+                        end: Alignment.centerRight,
+                      ),
+                    ),
                   ),
-                ),
-              ),
-            ] else
-              // Sin portada: fondo de marca con la cámara.
-              const _PromoBackdrop(),
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(children: [
-                const _PlayButton(),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: hasCover
-                      ? Column(
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Row(children: [
+                      const _PlayButton(),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -507,14 +506,42 @@ class _FeaturedCard extends StatelessWidget {
                                     fontSize: 12,
                                     fontWeight: FontWeight.w600)),
                           ],
-                        )
-                      // Sin portada: logo y lema, como en el diseño.
-                      : const _BrandSlogan(),
-                ),
-              ]),
-            ),
-          ]),
+                        ),
+                      ),
+                    ]),
+                  ),
+                ])
+              // Sin portada: la imagen de marca del diseño (destellos,
+              // tipografía y cámara incluidos).
+              : const _PromoImage(),
         ),
+      ),
+    );
+  }
+}
+
+/// Borde y brillo azul de la tarjeta destacada.
+final _featuredDecoration = BoxDecoration(
+  borderRadius: BorderRadius.circular(18),
+  border: Border.all(color: _glow.withValues(alpha: 0.6)),
+  boxShadow: [
+    BoxShadow(color: _glow.withValues(alpha: 0.28), blurRadius: 16),
+  ],
+);
+
+/// Imagen de marca "ALO BIEN – MUCHO MÁS QUE NOTICIAS" tomada del diseño.
+class _PromoImage extends StatelessWidget {
+  const _PromoImage();
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox.expand(
+      child: Image.asset(
+        'assets/images/banner_destacado.png',
+        fit: BoxFit.cover,
+        alignment: Alignment.center,
+        filterQuality: FilterQuality.high,
+        errorBuilder: (_, __, ___) => const ColoredBox(color: Color(0xFF05265F)),
       ),
     );
   }
@@ -558,75 +585,6 @@ class _PlayButton extends StatelessWidget {
   }
 }
 
-/// Logo de ALO BIEN con el lema "MUCHO MÁS QUE NOTICIAS".
-class _BrandSlogan extends StatelessWidget {
-  const _BrandSlogan();
-
-  @override
-  Widget build(BuildContext context) {
-    return const Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        AloLogo(height: _brandLogoHeight, alignment: Alignment.centerLeft),
-        SizedBox(height: 4),
-        Text('MUCHO MÁS\nQUE NOTICIAS',
-            style: TextStyle(
-                color: _cyan,
-                fontSize: 17,
-                fontWeight: FontWeight.w900,
-                height: 1.1)),
-      ],
-    );
-  }
-}
-
-/// Fondo de marca: azul con la cámara a la derecha, que se funde hacia la
-/// izquierda para dejar sitio al texto.
-class _PromoBackdrop extends StatelessWidget {
-  const _PromoBackdrop();
-
-  static const _base = Color(0xFF05265F);
-
-  @override
-  Widget build(BuildContext context) {
-    return Stack(fit: StackFit.expand, children: [
-      const DecoratedBox(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [Color(0xFF0B3C8C), _base],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-        ),
-      ),
-      Positioned(
-        right: 0,
-        top: 0,
-        bottom: 0,
-        width: 150,
-        child: Stack(fit: StackFit.expand, children: [
-          Image.asset(
-            'assets/images/banner_camara.png',
-            fit: BoxFit.cover,
-            errorBuilder: (_, __, ___) => const SizedBox.shrink(),
-          ),
-          const DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [_base, Color(0x0005265F)],
-                stops: [0.0, 0.55],
-                begin: Alignment.centerLeft,
-                end: Alignment.centerRight,
-              ),
-            ),
-          ),
-        ]),
-      ),
-    ]);
-  }
-}
-
 /// Banner de marca que se muestra mientras no haya contenido destacado.
 class _PromoCard extends StatelessWidget {
   const _PromoCard();
@@ -634,22 +592,10 @@ class _PromoCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: _glow.withValues(alpha: 0.5)),
-      ),
+      decoration: _featuredDecoration,
       child: ClipRRect(
         borderRadius: BorderRadius.circular(17),
-        child: const Stack(fit: StackFit.expand, children: [
-          _PromoBackdrop(),
-          Padding(
-            padding: EdgeInsets.fromLTRB(20, 16, 16, 16),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: _BrandSlogan(),
-            ),
-          ),
-        ]),
+        child: const _PromoImage(),
       ),
     );
   }
