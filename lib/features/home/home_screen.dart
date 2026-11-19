@@ -326,7 +326,10 @@ class _BrandBanner extends StatelessWidget {
                         fit: BoxFit.fitWidth,
                         child: Text('Conecta • Disfruta • Comparte',
                             style: baseText.copyWith(
-                                fontSize: 12, height: 1.2)),
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                letterSpacing: -0.1,
+                                height: 1.2)),
                       ),
                     ],
                   ),

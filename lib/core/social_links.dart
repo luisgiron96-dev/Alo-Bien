@@ -9,11 +9,13 @@ class SocialLink {
 }
 
 class SocialLinks {
-  // TODO: pega los enlaces reales entre las comillas (con https://)
-  static const instagram = '';
-  static const youtube = '';
-  static const facebook = '';
-  static const tiktok = '';
+  // Telegram queda pendiente: pega el enlace entre las comillas (con https://)
+  static const instagram =
+      'https://www.instagram.com/alobienplataforma?knvt=MXN5eDFjdHl2ZXVmMw==';
+  static const youtube = 'https://youtube.com/@alobienplataforma';
+  static const facebook = 'https://www.facebook.com/share/1CK312NpCh/';
+  static const tiktok =
+      'https://www.tiktok.com/@alobienplataforma?_r=1&_t=ZS-9BXaJmAXl0W';
   static const telegram = '';
 
   static const all = <SocialLink>[
