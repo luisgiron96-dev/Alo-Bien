@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../core/theme.dart';
 import '../models/content_item.dart';
 import 'content_card.dart';
-import 'cover_image.dart';
+import 'media_preview.dart';
 
 void showContentDetail(BuildContext context, ContentItem item) {
   showModalBottomSheet(
@@ -22,8 +22,7 @@ void showContentDetail(BuildContext context, ContentItem item) {
           ClipRRect(
             borderRadius:
                 const BorderRadius.vertical(top: Radius.circular(20)),
-            child: AspectRatio(
-                aspectRatio: 16 / 9, child: CoverImage(item: item)),
+            child: MediaPreview(item: item),
           ),
           Padding(
             padding: const EdgeInsets.all(20),
@@ -36,7 +35,9 @@ void showContentDetail(BuildContext context, ContentItem item) {
                 const SizedBox(height: 12),
                 Wrap(spacing: 8, runSpacing: 8, children: [
                   if (item.isNew) const NewBadge(),
-                  _Chip(icon: item.type.icon, text: item.type.label),
+                  _Chip(icon: item.section.icon, text: item.section.title),
+                  if (item.price != null && item.price!.isNotEmpty)
+                    _Chip(icon: Icons.sell_rounded, text: item.price!),
                   if (item.category != null && item.category!.isNotEmpty)
                     _Chip(icon: Icons.sell_rounded, text: item.category!),
                   _Chip(icon: Icons.event_rounded, text: item.dateLabel),

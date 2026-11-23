@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/supabase_config.dart';
 import '../../core/theme.dart';
@@ -24,8 +25,17 @@ class _CreatorDashboardScreenState extends State<CreatorDashboardScreen> {
   }
 
   Future<void> _refresh() async {
-    setState(() => _future = _load());
-    await _future;
+    if (!mounted) return;
+    // OJO: las llaves { } son importantes. Con "=>" Flutter lanza un error
+    // porque setState no acepta que se le devuelva un Future.
+    setState(() {
+      _future = _load();
+    });
+    try {
+      await _future;
+    } catch (_) {
+      // Si falla la recarga, el FutureBuilder muestra su propio mensaje.
+    }
   }
 
   void _toast(String text) {
@@ -50,11 +60,12 @@ class _CreatorDashboardScreenState extends State<CreatorDashboardScreen> {
       await db
           .from('content')
           .update({'status': publish ? 'published' : 'draft'}).eq('id', item.id);
-      await _refresh();
-      _toast(publish ? 'Contenido publicado.' : 'Contenido despublicado.');
     } catch (_) {
       _toast('No se pudo cambiar el estado.');
+      return;
     }
+    await _refresh();
+    _toast(publish ? 'Contenido publicado.' : 'Contenido despublicado.');
   }
 
   Future<void> _delete(ContentItem item) async {
@@ -74,6 +85,25 @@ class _CreatorDashboardScreenState extends State<CreatorDashboardScreen> {
       ),
     );
     if (ok != true) return;
+
+    // 1) Se borra la fila. Si la base de datos no da permiso, no borra nada
+    //    y lo avisamos.
+    try {
+      final deleted =
+          await db.from('content').delete().eq('id', item.id).select();
+      if (deleted.isEmpty) {
+        _toast('No se pudo eliminar: falta el permiso de eliminación en Supabase.');
+        return;
+      }
+    } on PostgrestException catch (e) {
+      _toast('No se pudo eliminar: ${e.message}');
+      return;
+    } catch (e) {
+      _toast('No se pudo eliminar. Revisa tu conexión.');
+      return;
+    }
+
+    // 2) Se borran los archivos. Si fallan, el contenido ya quedó eliminado.
     try {
       if (item.filePath != null && item.filePath!.isNotEmpty) {
         await db.storage.from('media').remove([item.filePath!]);
@@ -81,12 +111,11 @@ class _CreatorDashboardScreenState extends State<CreatorDashboardScreen> {
       if (item.coverPath != null && item.coverPath!.isNotEmpty) {
         await db.storage.from('covers').remove([item.coverPath!]);
       }
-      await db.from('content').delete().eq('id', item.id);
-      await _refresh();
-      _toast('Contenido eliminado.');
-    } catch (_) {
-      _toast('No se pudo eliminar.');
-    }
+    } catch (_) {}
+
+    // 3) Se recarga la lista y se avisa.
+    await _refresh();
+    _toast('Contenido eliminado.');
   }
 
   @override
@@ -154,7 +183,8 @@ class _CreatorDashboardScreenState extends State<CreatorDashboardScreen> {
                   ),
                   title: Text(item.title,
                       maxLines: 1, overflow: TextOverflow.ellipsis),
-                  subtitle: Text('${item.type.label} • ${item.dateLabel}'),
+                  subtitle: Text(
+                      '${item.section.title} • ${item.type.label} • ${item.dateLabel}'),
                   trailing: Row(mainAxisSize: MainAxisSize.min, children: [
                     _StatusChip(published: item.status == 'published'),
                     PopupMenuButton<String>(

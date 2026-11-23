@@ -52,8 +52,11 @@ class _RoleLoaderState extends State<_RoleLoader> {
                       style: TextStyle(fontWeight: FontWeight.w700)),
                   const SizedBox(height: 16),
                   FilledButton(
-                    onPressed: () =>
-                        setState(() => _future = AuthService.loadProfile()),
+                    onPressed: () {
+                      setState(() {
+                        _future = AuthService.loadProfile();
+                      });
+                    },
                     child: const Text('Reintentar'),
                   ),
                   TextButton(

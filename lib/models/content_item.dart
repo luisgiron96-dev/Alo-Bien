@@ -3,6 +3,54 @@ import '../core/supabase_config.dart';
 
 enum ContentType { video, audio, image, pdf }
 
+/// Sección de la app donde se muestra un contenido. Cada contenido vive en
+/// UNA sola sección (la que elige el creador al subirlo), así no se repite.
+/// El orden de este enum es el orden en que aparecen en el Inicio.
+enum ContentSection {
+  destacado('destacado', 'Contenido destacado', Icons.star_rounded),
+  producto('productos', 'Productos', Icons.shopping_bag_rounded),
+  novedades('novedades', 'Novedades', Icons.fiber_new_rounded),
+  video('videos', 'Videos', Icons.play_circle_rounded),
+  musica('musica', 'Música', Icons.music_note_rounded),
+  imagen('imagenes', 'Imágenes y galerías', Icons.image_rounded),
+  pdf('pdf', 'Documentos PDF', Icons.picture_as_pdf_rounded);
+
+  /// Valor guardado en la columna `section` de Supabase.
+  final String db;
+  final String title;
+  final IconData icon;
+  const ContentSection(this.db, this.title, this.icon);
+
+  /// Tipos de archivo que se pueden subir en esta sección.
+  List<ContentType> get allowedTypes => switch (this) {
+        ContentSection.destacado ||
+        ContentSection.novedades =>
+          ContentType.values,
+        ContentSection.producto || ContentSection.imagen => [ContentType.image],
+        ContentSection.video => [ContentType.video],
+        ContentSection.musica => [ContentType.audio],
+        ContentSection.pdf => [ContentType.pdf],
+      };
+
+  static ContentSection? fromDb(String? s) {
+    for (final v in ContentSection.values) {
+      if (v.db == s) return v;
+    }
+    return null;
+  }
+
+  /// Sección por defecto para contenido antiguo que aún no tiene `section`.
+  static ContentSection fallback(ContentType type, bool featured) {
+    if (featured) return ContentSection.destacado;
+    return switch (type) {
+      ContentType.video => ContentSection.video,
+      ContentType.audio => ContentSection.musica,
+      ContentType.image => ContentSection.imagen,
+      ContentType.pdf => ContentSection.pdf,
+    };
+  }
+}
+
 ContentType contentTypeFromDb(String? s) => ContentType.values
     .firstWhere((t) => t.name == s, orElse: () => ContentType.video);
 
@@ -35,6 +83,8 @@ class ContentItem {
 
   final String id;
   final ContentType type;
+  final ContentSection section;
+  final String? price;
   final String title;
   final String? description;
   final String? category;
@@ -49,6 +99,8 @@ class ContentItem {
   const ContentItem({
     required this.id,
     required this.type,
+    required this.section,
+    this.price,
     required this.title,
     this.description,
     this.category,
@@ -61,22 +113,30 @@ class ContentItem {
     this.publishedAt,
   });
 
-  factory ContentItem.fromMap(Map<String, dynamic> m) => ContentItem(
-        id: m['id'] as String,
-        type: contentTypeFromDb(m['type'] as String?),
-        title: (m['title'] ?? '') as String,
-        description: m['description'] as String?,
-        category: m['category'] as String?,
-        artist: m['artist'] as String?,
-        filePath: m['file_path'] as String?,
-        coverPath: m['cover_path'] as String?,
-        durationSeconds: m['duration_seconds'] as int?,
-        featured: (m['featured'] ?? false) as bool,
-        status: (m['status'] ?? 'draft') as String,
-        publishedAt: m['published_at'] == null
-            ? null
-            : DateTime.parse(m['published_at'] as String).toLocal(),
-      );
+  factory ContentItem.fromMap(Map<String, dynamic> m) {
+    final type = contentTypeFromDb(m['type'] as String?);
+    final legacyFeatured = (m['featured'] ?? false) as bool;
+    final section = ContentSection.fromDb(m['section'] as String?) ??
+        ContentSection.fallback(type, legacyFeatured);
+    return ContentItem(
+      id: m['id'] as String,
+      type: type,
+      section: section,
+      price: m['price'] as String?,
+      title: (m['title'] ?? '') as String,
+      description: m['description'] as String?,
+      category: m['category'] as String?,
+      artist: m['artist'] as String?,
+      filePath: m['file_path'] as String?,
+      coverPath: m['cover_path'] as String?,
+      durationSeconds: m['duration_seconds'] as int?,
+      featured: section == ContentSection.destacado,
+      status: (m['status'] ?? 'draft') as String,
+      publishedAt: m['published_at'] == null
+          ? null
+          : DateTime.parse(m['published_at'] as String).toLocal(),
+    );
+  }
 
   bool get isNew =>
       publishedAt != null &&

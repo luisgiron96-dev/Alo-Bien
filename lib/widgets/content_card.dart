@@ -62,6 +62,12 @@ class ContentCard extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
                 style:
                     const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+            if (item.price != null && item.price!.isNotEmpty)
+              Text(item.price!,
+                  style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: AloColors.lavender)),
           ],
         ),
       ),

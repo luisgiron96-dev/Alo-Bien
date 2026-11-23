@@ -41,14 +41,15 @@ class _UploadContentScreenState extends State<UploadContentScreen> {
   final _desc = TextEditingController();
   final _category = TextEditingController();
   final _artist = TextEditingController();
+  final _price = TextEditingController();
 
+  ContentSection _section = ContentSection.destacado;
   ContentType _type = ContentType.video;
   PlatformFile? _file;
   PlatformFile? _cover;
   int _fileBytes = 0;
   int _coverBytes = 0;
   bool _publishNow = true;
-  bool _featured = false;
   bool _busy = false;
   String? _error;
 
@@ -58,7 +59,19 @@ class _UploadContentScreenState extends State<UploadContentScreen> {
     _desc.dispose();
     _category.dispose();
     _artist.dispose();
+    _price.dispose();
     super.dispose();
+  }
+
+  void _selectSection(ContentSection sec) {
+    setState(() {
+      _section = sec;
+      final allowed = sec.allowedTypes;
+      if (!allowed.contains(_type)) _type = allowed.first;
+      _file = null;
+      _fileBytes = 0;
+      _error = null;
+    });
   }
 
   String _mb(int bytes) => (bytes / (1024 * 1024)).toStringAsFixed(1);
@@ -157,6 +170,11 @@ class _UploadContentScreenState extends State<UploadContentScreen> {
       // Solo un creador puede insertar (lo impone la base de datos).
       await db.from('content').insert({
         'type': _type.name,
+        'section': _section.db,
+        'price': _section == ContentSection.producto &&
+                _price.text.trim().isNotEmpty
+            ? _price.text.trim()
+            : null,
         'title': _title.text.trim(),
         'description': _desc.text.trim().isEmpty ? null : _desc.text.trim(),
         'category':
@@ -164,7 +182,7 @@ class _UploadContentScreenState extends State<UploadContentScreen> {
         'artist': _artist.text.trim().isEmpty ? null : _artist.text.trim(),
         'file_path': mediaPath,
         'cover_path': coverPath,
-        'featured': _featured,
+        'featured': _section == ContentSection.destacado,
         'status': _publishNow ? 'published' : 'draft',
       });
 
@@ -201,23 +219,38 @@ class _UploadContentScreenState extends State<UploadContentScreen> {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            const Text('Tipo de contenido',
+            const Text('¿Dónde se va a mostrar? *',
                 style: TextStyle(fontWeight: FontWeight.w700)),
             const SizedBox(height: 8),
-            Wrap(spacing: 8, children: [
-              for (final t in ContentType.values)
+            Wrap(spacing: 8, runSpacing: 4, children: [
+              for (final sec in ContentSection.values)
                 ChoiceChip(
-                  avatar: Icon(t.icon, size: 18),
-                  label: Text(t.label),
-                  selected: _type == t,
-                  onSelected: (_) => setState(() {
-                    _type = t;
-                    _file = null;
-                    _fileBytes = 0;
-                    _error = null;
-                  }),
+                  avatar: Icon(sec.icon, size: 18),
+                  label: Text(sec.title),
+                  selected: _section == sec,
+                  onSelected: (_) => _selectSection(sec),
                 ),
             ]),
+            if (_section.allowedTypes.length > 1) ...[
+              const SizedBox(height: 16),
+              const Text('Tipo de archivo',
+                  style: TextStyle(fontWeight: FontWeight.w700)),
+              const SizedBox(height: 8),
+              Wrap(spacing: 8, children: [
+                for (final t in _section.allowedTypes)
+                  ChoiceChip(
+                    avatar: Icon(t.icon, size: 18),
+                    label: Text(t.label),
+                    selected: _type == t,
+                    onSelected: (_) => setState(() {
+                      _type = t;
+                      _file = null;
+                      _fileBytes = 0;
+                      _error = null;
+                    }),
+                  ),
+              ]),
+            ],
             const SizedBox(height: 16),
             OutlinedButton.icon(
               onPressed: _pickFile,
@@ -240,8 +273,11 @@ class _UploadContentScreenState extends State<UploadContentScreen> {
             TextField(
               controller: _title,
               textCapitalization: TextCapitalization.sentences,
-              decoration: const InputDecoration(
-                  labelText: 'Título *', border: OutlineInputBorder()),
+              decoration: InputDecoration(
+                  labelText: _section == ContentSection.producto
+                      ? 'Nombre del producto *'
+                      : 'Título *',
+                  border: const OutlineInputBorder()),
             ),
             const SizedBox(height: 12),
             TextField(
@@ -259,13 +295,25 @@ class _UploadContentScreenState extends State<UploadContentScreen> {
                   labelText: 'Categoría (ej. Entrevistas)',
                   border: OutlineInputBorder()),
             ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _artist,
-              textCapitalization: TextCapitalization.words,
-              decoration: const InputDecoration(
-                  labelText: 'Artista o autor', border: OutlineInputBorder()),
-            ),
+            if (_section == ContentSection.producto) ...[
+              const SizedBox(height: 12),
+              TextField(
+                controller: _price,
+                keyboardType: TextInputType.text,
+                decoration: const InputDecoration(
+                    labelText: 'Precio (ej. \$25.000)',
+                    border: OutlineInputBorder()),
+              ),
+            ] else ...[
+              const SizedBox(height: 12),
+              TextField(
+                controller: _artist,
+                textCapitalization: TextCapitalization.words,
+                decoration: const InputDecoration(
+                    labelText: 'Artista o autor',
+                    border: OutlineInputBorder()),
+              ),
+            ],
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
               title: const Text('Publicar ahora'),
@@ -274,12 +322,6 @@ class _UploadContentScreenState extends State<UploadContentScreen> {
                   : 'Se guarda como borrador, solo tú lo ves.'),
               value: _publishNow,
               onChanged: (v) => setState(() => _publishNow = v),
-            ),
-            SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              title: const Text('Destacar en el Inicio'),
-              value: _featured,
-              onChanged: (v) => setState(() => _featured = v),
             ),
             if (_error != null) ...[
               const SizedBox(height: 8),

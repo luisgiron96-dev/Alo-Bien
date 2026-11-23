@@ -17,11 +17,30 @@ dependencies:
   supabase_flutter: ^2.8.0
   file_picker: ^13.4.0
   font_awesome_flutter: ^11.0.0
+  video_player: ^2.9.2
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^5.0.0
+  flutter_launcher_icons: ^0.14.3
+  flutter_native_splash: ^2.4.4
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/icon/icon.png"
+  adaptive_icon_background: "#0D1933"
+  adaptive_icon_foreground: "assets/icon/icon_foreground.png"
+  remove_alpha_ios: true
+
+flutter_native_splash:
+  color: "#0D1933"
+  image: assets/splash/splash_logo.png
+  android_12:
+    color: "#0D1933"
+    image: assets/splash/splash_android12.png
+  web: false
 
 flutter:
   uses-material-design: true

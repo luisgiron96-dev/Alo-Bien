@@ -55,14 +55,25 @@ class HomeScreen extends StatelessWidget {
           return const Center(child: CircularProgressIndicator());
         }
         final items = snap.data!;
-        final featured = items.where((i) => i.featured).toList();
+        // Cada contenido aparece solo en la sección que eligió el creador.
+        List<ContentItem> of(ContentSection s) =>
+            items.where((i) => i.section == s).toList();
+        final featured = of(ContentSection.destacado);
+        final products = of(ContentSection.producto);
+        final nonProducts =
+            items.where((i) => i.section != ContentSection.producto).toList();
         final hero = featured.isNotEmpty
             ? featured.first
-            : (items.isNotEmpty ? items.first : null);
+            : (nonProducts.isNotEmpty ? nonProducts.first : null);
+        const rowSections = [
+          ContentSection.novedades,
+          ContentSection.video,
+          ContentSection.musica,
+          ContentSection.imagen,
+          ContentSection.pdf,
+        ];
         final rows = <(String, List<ContentItem>)>[
-          ('Novedades', items.where((i) => i.isNew).toList()),
-          for (final t in ContentType.values)
-            (t.rowTitle, items.where((i) => i.type == t).toList()),
+          for (final sec in rowSections) (sec.title, of(sec)),
         ].where((r) => r.$2.isNotEmpty).toList();
 
         return ListView(
@@ -73,10 +84,10 @@ class HomeScreen extends StatelessWidget {
             SectionHeader(
               title: 'Contenido destacado',
               moreLabel: 'Ver más',
-              onMore: items.isEmpty
+              onMore: featured.isEmpty
                   ? null
-                  : () => _openList(context, 'Contenido destacado',
-                      featured.isNotEmpty ? featured : items),
+                  : () => _openList(
+                      context, ContentSection.destacado.title, featured),
             ),
             _FeaturedRow(
               items: featured,
@@ -96,10 +107,17 @@ class HomeScreen extends StatelessWidget {
             SectionHeader(
               title: 'Productos ALO BIEN',
               moreLabel: 'Ver todos',
-              onMore: () =>
-                  _openWeb(context, 'Tienda', AppConfig.tabs[3].uri),
+              onMore: products.isNotEmpty
+                  ? () => _openList(
+                      context, ContentSection.producto.title, products)
+                  : () => _openWeb(context, 'Tienda', AppConfig.tabs[3].uri),
             ),
-            const _Products(),
+            // Productos subidos desde el panel; si aún no hay, se muestran
+            // los accesos fijos de la tienda.
+            if (products.isNotEmpty)
+              _ContentRow(items: products)
+            else
+              const _Products(),
             if (items.isEmpty)
               const Padding(
                 padding: EdgeInsets.all(32),
