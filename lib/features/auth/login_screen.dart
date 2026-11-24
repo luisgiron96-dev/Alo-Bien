@@ -33,7 +33,50 @@ class _LoginScreenState extends State<LoginScreen> {
     if (m.contains('invalid login')) return 'Correo o contraseña incorrectos.';
     if (m.contains('not confirmed')) return 'Tu correo aún no está confirmado.';
     if (m.contains('already registered')) return 'Ese correo ya tiene una cuenta.';
+    if (m.contains('rate limit')) {
+      return 'Se enviaron muchos correos en poco tiempo. Intenta de nuevo en unos minutos.';
+    }
     return e.message;
+  }
+
+  Future<void> _forgot() async {
+    final email = _email.text.trim();
+    if (!email.contains('@') || !email.contains('.')) {
+      setState(() {
+        _isError = true;
+        _msg = 'Escribe tu correo en el campo de arriba y vuelve a tocar "¿Olvidaste tu contraseña?".';
+      });
+      return;
+    }
+    setState(() {
+      _loading = true;
+      _msg = null;
+    });
+    try {
+      await AuthService.sendPasswordReset(email);
+      if (mounted) {
+        setState(() {
+          _isError = false;
+          _msg = 'Si el correo está registrado, te enviamos un enlace. Ábrelo desde este celular para crear una nueva contraseña.';
+        });
+      }
+    } on AuthException catch (e) {
+      if (mounted) {
+        setState(() {
+          _isError = true;
+          _msg = _friendly(e);
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _isError = true;
+          _msg = 'No pudimos conectar. Revisa tu internet.';
+        });
+      }
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
   }
 
   Future<void> _submit() async {
@@ -57,7 +100,7 @@ class _LoginScreenState extends State<LoginScreen> {
           setState(() {
             _register = false;
             _isError = false;
-            _msg = 'Cuenta creada. Revisa tu correo para confirmarla y luego inicia sesión.';
+            _msg = 'Cuenta creada. Abre el correo desde este celular, toca "Confirmar" y la app se abrirá sola.';
           });
         }
       } else {
@@ -196,7 +239,12 @@ class _LoginScreenState extends State<LoginScreen> {
                             loading: _loading,
                             onTap: _loading ? null : _submit,
                           ),
-                          const SizedBox(height: 8),
+                          if (!_register)
+                            TextButton(
+                              onPressed: _loading ? null : _forgot,
+                              child: const Text('¿Olvidaste tu contraseña?'),
+                            ),
+                          const SizedBox(height: 4),
                           TextButton(
                             onPressed: _loading
                                 ? null

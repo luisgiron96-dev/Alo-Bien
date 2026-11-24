@@ -1,11 +1,14 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/config.dart';
 import '../../core/social_links.dart';
+import '../../core/supabase_config.dart';
 import '../../core/theme.dart';
 import '../../models/content_item.dart';
 import '../../services/content_repository.dart';
@@ -34,27 +37,79 @@ void _openList(BuildContext context, String title, List<ContentItem> items) {
   ));
 }
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  List<ContentItem>? _items;
+  bool _error = false;
+  RealtimeChannel? _channel;
+  Timer? _debounce;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+    // Cualquier cambio (publicar, despublicar, ELIMINAR) recarga Inicio.
+    _channel = ContentRepository.subscribeChanges(() {
+      _debounce?.cancel();
+      _debounce = Timer(const Duration(milliseconds: 300), _load);
+    });
+  }
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    if (_channel != null) db.removeChannel(_channel!);
+    super.dispose();
+  }
+
+  Future<void> _load() async {
+    try {
+      final data = await ContentRepository.fetchPublished();
+      if (!mounted) return;
+      setState(() {
+        _items = data;
+        _error = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      // Si ya había datos los conservamos; solo mostramos error si no hay nada.
+      if (_items == null) setState(() => _error = true);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    return StreamBuilder<List<ContentItem>>(
-      stream: ContentRepository.watchPublished(),
-      builder: (context, snap) {
-        if (snap.hasError) {
-          return const Center(
-            child: Padding(
-              padding: EdgeInsets.all(32),
-              child: Text('No pudimos cargar el contenido. Revisa tu conexión.',
-                  textAlign: TextAlign.center),
-            ),
+    return RefreshIndicator(
+      onRefresh: _load,
+      child: _buildBody(context),
+    );
+  }
+
+  Widget _buildBody(BuildContext context) {
+    {
+      {
+        if (_error && _items == null) {
+          return ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            children: const [
+              Padding(
+                padding: EdgeInsets.all(32),
+                child: Text(
+                    'No pudimos cargar el contenido. Desliza hacia abajo para reintentar.',
+                    textAlign: TextAlign.center),
+              ),
+            ],
           );
         }
-        if (!snap.hasData) {
+        if (_items == null) {
           return const Center(child: CircularProgressIndicator());
         }
-        final items = snap.data!;
+        final items = _items!;
         // Cada contenido aparece solo en la sección que eligió el creador.
         List<ContentItem> of(ContentSection s) =>
             items.where((i) => i.section == s).toList();
@@ -77,6 +132,7 @@ class HomeScreen extends StatelessWidget {
         ].where((r) => r.$2.isNotEmpty).toList();
 
         return ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
           padding: EdgeInsets.zero,
           children: [
             if (hero != null) _Hero(item: hero),
@@ -134,8 +190,8 @@ class HomeScreen extends StatelessWidget {
             const SizedBox(height: 24),
           ],
         );
-      },
-    );
+      }
+    }
   }
 }
 

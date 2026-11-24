@@ -45,7 +45,10 @@ class NotificationsScreen extends StatelessWidget {
                           final date =
                               '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
                           return ListTile(
-                            onTap: () => showContentDetail(context, item),
+                            onTap: () {
+                              c.markRead(n);
+                              showContentDetail(context, item);
+                            },
                             leading: SizedBox(
                               width: 52,
                               height: 52,

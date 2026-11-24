@@ -72,19 +72,41 @@ class NotificationsController extends ChangeNotifier {
     }
   }
 
-  Future<void> markAllRead() async {
+  /// Marca como leídas las notificaciones indicadas (o todas las pendientes).
+  /// Actualiza la pantalla al instante (el globo rojo desaparece) y luego
+  /// guarda en Supabase.
+  Future<void> markAllRead() => _markRead(items.where((n) => !n.read).toList());
+
+  Future<void> markRead(AppNotification n) async {
+    if (n.read) return;
+    await _markRead([n]);
+  }
+
+  Future<void> _markRead(List<AppNotification> targets) async {
     final uid = db.auth.currentUser?.id;
-    if (uid == null) return;
-    final pending = items
-        .where((n) => !n.read)
-        .map((n) => {'user_id': uid, 'notification_id': n.id})
-        .toList();
-    if (pending.isEmpty) return;
+    if (uid == null || targets.isEmpty) return;
+    final ids = targets.map((n) => n.id).toSet();
+
+    // 1) Cambio inmediato en pantalla.
+    items = [
+      for (final n in items)
+        if (ids.contains(n.id))
+          AppNotification(
+              id: n.id, createdAt: n.createdAt, content: n.content, read: true)
+        else
+          n,
+    ];
+    notifyListeners();
+
+    // 2) Se guarda en la base de datos.
     try {
-      await db.from('notification_reads').insert(pending);
+      await db.from('notification_reads').upsert(
+            [for (final id in ids) {'user_id': uid, 'notification_id': id}],
+            onConflict: 'user_id,notification_id',
+            ignoreDuplicates: true,
+          );
     } catch (e) {
       debugPrint('Error marcando como leídas: $e');
     }
-    await load();
   }
 }
