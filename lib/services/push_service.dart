@@ -12,7 +12,10 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
 /// Payload esperado desde el sitio (FCM):
 /// notification: {title, body}
-/// data: {url: "https://alobienplataforma.com/...", type: "video|contenido|novedad|comunidad", content_id: "123"}
+/// data: {url: "https://alobienplataforma.com/...", type: "video|contenido|novedad|comunidad",
+///        content_id: "<id del contenido de la app (uuid)>"}
+/// - Si trae content_id (uuid), el toque abre ese contenido dentro de la app.
+/// - Si no, y trae url del sitio, abre esa página dentro de la app.
 class PushService {
   PushService._();
   static final instance = PushService._();
@@ -21,6 +24,11 @@ class PushService {
 
   /// Enlace pendiente de abrir (tap en notificación).
   final ValueNotifier<Uri?> pendingLink = ValueNotifier(null);
+
+  /// Contenido (uuid) pendiente de abrir desde una notificación.
+  final ValueNotifier<String?> pendingContentId = ValueNotifier(null);
+
+  static final _uuid = RegExp(r'^[0-9a-fA-F-]{36}$');
 
   /// Mensaje recibido con la app abierta.
   final ValueNotifier<RemoteMessage?> foregroundMessage = ValueNotifier(null);
@@ -34,8 +42,20 @@ class PushService {
   }
 
   void _onTap(RemoteMessage m) {
+    final id = (m.data['content_id'] ?? '').toString().trim();
+    if (_uuid.hasMatch(id)) pendingContentId.value = id;
     final link = AppConfig.safeLink(m.data['url'] as String?);
     if (link != null) pendingLink.value = link;
+  }
+
+  /// Abre el destino de un mensaje (por ejemplo, desde el aviso con la app abierta).
+  void handleTap(RemoteMessage m) => _onTap(m);
+
+  /// ¿El mensaje tiene un destino al que se pueda ir?
+  bool hasTarget(RemoteMessage m) {
+    final id = (m.data['content_id'] ?? '').toString().trim();
+    return _uuid.hasMatch(id) ||
+        AppConfig.safeLink(m.data['url'] as String?) != null;
   }
 
   /// Pide permiso (Android 13+/iOS) y suscribe a los temas.

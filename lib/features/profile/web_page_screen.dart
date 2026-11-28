@@ -23,8 +23,12 @@ class _WebPageScreenState extends State<WebPageScreen> {
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setBackgroundColor(AloColors.bg)
       ..setNavigationDelegate(NavigationDelegate(
-        onPageStarted: (_) => setState(() => _loading = true),
-        onPageFinished: (_) => setState(() => _loading = false),
+        onPageStarted: (_) {
+          if (mounted) setState(() => _loading = true);
+        },
+        onPageFinished: (_) {
+          if (mounted) setState(() => _loading = false);
+        },
         onNavigationRequest: (r) {
           if (!r.isMainFrame) return NavigationDecision.navigate;
           final u = Uri.tryParse(r.url);
@@ -39,16 +43,29 @@ class _WebPageScreenState extends State<WebPageScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.title),
-        bottom: _loading
-            ? const PreferredSize(
-                preferredSize: Size.fromHeight(2),
-                child: LinearProgressIndicator(minHeight: 2))
-            : null,
+    // El botón "atrás" retrocede dentro de la web y, al llegar al inicio,
+    // cierra esta pantalla.
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) async {
+        if (didPop) return;
+        if (await _c.canGoBack()) {
+          await _c.goBack();
+        } else if (mounted) {
+          Navigator.of(context).pop();
+        }
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(widget.title),
+          bottom: _loading
+              ? const PreferredSize(
+                  preferredSize: Size.fromHeight(2),
+                  child: LinearProgressIndicator(minHeight: 2))
+              : null,
+        ),
+        body: WebViewWidget(controller: _c),
       ),
-      body: WebViewWidget(controller: _c),
     );
   }
 }
