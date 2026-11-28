@@ -24,8 +24,13 @@ class _AuthGateState extends State<AuthGate> {
     super.initState();
     // Al abrir el enlace del correo de recuperación se pide la nueva contraseña.
     _sub = db.auth.onAuthStateChange.listen((s) {
-      if (s.event == AuthChangeEvent.passwordRecovery && mounted) {
+      if (!mounted) return;
+      if (s.event == AuthChangeEvent.passwordRecovery) {
         setState(() => _recovery = true);
+      } else if (s.event == AuthChangeEvent.signedOut) {
+        // Cierra de una vez cualquier pantalla abierta encima (perfil,
+        // configuración, detalles...) para que se vea el inicio de sesión.
+        Navigator.of(context).popUntil((route) => route.isFirst);
       }
     });
   }

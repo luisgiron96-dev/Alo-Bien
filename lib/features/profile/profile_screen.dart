@@ -278,7 +278,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
           contentPadding: EdgeInsets.zero,
           leading: const Icon(Icons.logout_rounded),
           title: const Text('Cerrar sesión'),
-          onTap: AuthService.signOut,
+          onTap: () async {
+            final nav = Navigator.of(context);
+            try {
+              await AuthService.signOut();
+            } catch (_) {}
+            // Vuelve de una vez a la pantalla raíz (el inicio de sesión).
+            nav.popUntil((route) => route.isFirst);
+          },
         ),
       ],
     );
