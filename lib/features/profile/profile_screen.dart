@@ -4,12 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../../core/config.dart';
 import '../../core/theme.dart';
 import '../../models/user_profile.dart';
 import '../../services/auth_service.dart';
 import 'settings_screen.dart';
-import 'web_page_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   final UserProfile profile;
@@ -185,12 +183,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // TODO: confirmar las rutas reales del sitio en config.dart
-    final links = <Section>[
-      const Section('Sitio ALO BIEN', Icons.language_rounded, '/'),
-      AppConfig.tabs[2], // Comunidad
-      AppConfig.tabs[3], // Tienda
-    ];
     final initial = profile.displayName.characters.first.toUpperCase();
     final hasName = (profile.fullName ?? '').trim().isNotEmpty;
 
@@ -251,19 +243,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             label: Text(profile.isCreator ? 'Creador de contenido' : 'Usuario'),
           ),
         ),
-        const SizedBox(height: 16),
-        const Text('Sitio web',
-            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
-        for (final s in links)
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: Icon(s.icon, color: AloColors.lavender),
-            title: Text(s.label),
-            trailing: const Icon(Icons.chevron_right_rounded),
-            onTap: () => Navigator.of(context).push(MaterialPageRoute(
-              builder: (_) => WebPageScreen(title: s.label, uri: s.uri),
-            )),
-          ),
+        const SizedBox(height: 8),
         const Divider(height: 32),
         ListTile(
           contentPadding: EdgeInsets.zero,

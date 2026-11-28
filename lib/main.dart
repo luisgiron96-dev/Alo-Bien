@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'core/supabase_config.dart';
 import 'core/theme.dart';
 import 'features/auth/auth_gate.dart';
+import 'features/splash/animated_splash.dart';
 import 'firebase_options.dart';
 import 'services/push_service.dart';
 
@@ -27,6 +28,6 @@ class AloBienApp extends StatelessWidget {
         title: 'ALO BIEN',
         debugShowCheckedModeBanner: false,
         theme: buildTheme(),
-        home: const AuthGate(),
+        home: const AnimatedSplash(child: AuthGate()),
       );
 }
